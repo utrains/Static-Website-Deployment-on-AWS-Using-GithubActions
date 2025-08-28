@@ -11,7 +11,7 @@ variable "bucket_name" {
 
 variable "cp-path" {
   type = string
-  default = "Restaurantly"
+  default = "website"
 }
 
 variable "file-key" {
