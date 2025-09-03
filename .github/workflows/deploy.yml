@@ -4,9 +4,12 @@ on:
   workflow_dispatch:
 
 env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION: us-east-2
+    OIDC_ROLE_ARN: ${{ vars.OIDC_ROLE_ARN }}
+    AWS_REGION: us-east-1
+
+permissions:
+    id-token: write
+    contents: read 
 
 jobs:
 
@@ -28,6 +31,12 @@ jobs:
             version: 2                         
             verbose: false                     
             arch: amd64
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}      
       
       - name: terraform init & plan
         run: |
@@ -59,7 +68,13 @@ jobs:
             version: 2                         
             verbose: false                     
             arch: amd64
-            
+
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: Download artifact
         uses: actions/download-artifact@v4
         with:
@@ -105,6 +120,12 @@ jobs:
             version: 2                         
             verbose: false                     
             arch: amd64
+      
+      - name: Configure AWS credentials using OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.OIDC_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Download artifact
         uses: actions/download-artifact@v4

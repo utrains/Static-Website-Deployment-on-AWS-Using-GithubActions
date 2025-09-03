@@ -117,7 +117,27 @@ resource "aws_s3_bucket_website_configuration" "bucket" {
 
 }
 
-# ~~~~~~~~~~~~~~~~~~~~~~ Configure CloudFont ~~~~~~~~~~~~~~~~~~~~~
+# ------------------ Fetch existing ACM certificate ------------------
+
+data "aws_acm_certificate" "existing_cert" {
+  domain      = var.domain_name
+  statuses    = ["ISSUED"]
+  most_recent = true
+}
+
+# ------------------ Lookup Route 53 Hosted Zone by Domain ------------------
+
+# Automatically find hosted zone (you can use root domain or subdomain)
+data "aws_route53_zone" "target" {
+  name         = "${var.domain_name}."  # ensure trailing dot
+  private_zone = false
+}
+
+locals {
+  full_domain = "${var.subdomain}.${var.domain_name}" 
+}
+
+# ------------------ CloudFront Configuration ------------------
 
 locals {
   s3_origin_id   = "${var.bucket_name}-origin"
@@ -125,12 +145,12 @@ locals {
 }
 
 resource "aws_cloudfront_distribution" "web-distribution" {
-  
   enabled = true
-  
+
   origin {
-    origin_id                = local.s3_origin_id
-    domain_name              = local.s3_domain_name
+    origin_id   = local.s3_origin_id
+    domain_name = local.s3_domain_name
+
     custom_origin_config {
       http_port              = 80
       https_port             = 443
@@ -139,8 +159,9 @@ resource "aws_cloudfront_distribution" "web-distribution" {
     }
   }
 
+  aliases = [local.full_domain]
+
   default_cache_behavior {
-    
     target_origin_id = local.s3_origin_id
     allowed_methods  = ["GET", "HEAD"]
     cached_methods   = ["GET", "HEAD"]
@@ -164,17 +185,43 @@ resource "aws_cloudfront_distribution" "web-distribution" {
       restriction_type = "none"
     }
   }
-  
+
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn      = data.aws_acm_certificate.existing_cert.arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
   }
 
   price_class = "PriceClass_200"
 
-  depends_on = [ aws_s3_bucket.bucket1 , null_resource.upload_files, aws_s3_bucket_acl.bucket1-acl, aws_s3_bucket_policy.allow_access ]
-  
+  depends_on = [
+    aws_s3_bucket.bucket1,
+    null_resource.upload_files,
+    aws_s3_bucket_acl.bucket1-acl,
+    aws_s3_bucket_policy.allow_access
+  ]
 }
 
-output "INFO" {
-  value = "AWS Resources  has been provisioned yes. Go to http://${aws_cloudfront_distribution.web-distribution.domain_name}"
+# ------------------ Route 53 DNS Record ------------------
+
+resource "aws_route53_record" "cdn_record" {
+  zone_id = data.aws_route53_zone.target.zone_id
+  name    = local.full_domain
+  type    = "A"
+
+  alias {
+    name                   = aws_cloudfront_distribution.web-distribution.domain_name
+    zone_id                = aws_cloudfront_distribution.web-distribution.hosted_zone_id
+    evaluate_target_health = false
+  }
+}
+
+# ------------------ Outputs ------------------
+
+output "cloudfront_distribution_url" {
+  value = "https://${aws_cloudfront_distribution.web-distribution.domain_name}"
+}
+
+output "cdn_custom_domain" {
+  value = "https://${local.full_domain}"
 }

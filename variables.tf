@@ -1,6 +1,6 @@
 variable "region" {
   type = string
-  default = "us-east-2"
+  default = "us-east-1"
 }
 
 variable "bucket_name" {
@@ -19,3 +19,12 @@ variable "file-key" {
   default = "index.html"
 }
 
+variable "domain_name" {
+  type    = string
+  default = "workingonproject.site" # e.g. www.example.com
+}     
+ 
+variable "subdomain" {
+  type        = string
+  default = "food" #Subdomain prefix (e.g. 'food')"
+} 
